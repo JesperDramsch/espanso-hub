@@ -1,0 +1,42 @@
+name: PR Quality Check Comment
+
+on:
+    workflow_run:
+        workflows: ['PR Quality Check Run']
+        types:
+            - completed
+        branches-ignore:
+            - main
+
+jobs:
+    comment:
+        runs-on: ubuntu-latest
+        if: >
+            github.event.workflow_run.event == 'pull_request' &&
+            github.event.workflow_run.conclusion == 'success'
+        steps:
+            - name: 'Download artifact'
+              uses: actions/download-artifact@v2
+              with:
+                  name: validation_report.md
+            - name: 'Create Github comment body'
+              run: |
+                  import json
+                  with open("validation_report.md", "r", encoding="utf-8") as input:
+                    with open("body.json", "w", encoding="utf-8") as output:
+                      output.write(json.dumps({"body": input.read()}))
+              shell: python
+            - name: Post report as Comment
+              run: |
+                  BRANCH=$(git branch --show-current)
+                  if [ "$BRANCH" = "main" ]; then
+                    echo "Skipping on main branch"
+                    exit 0
+                  fi
+
+                  curl -sL  -X POST -d @body.json \
+                    -H "Content-Type: application/json" \
+                    -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                    "$GITHUB_COMMENT_URL"
+              env:
+                  GITHUB_COMMENT_URL: ${{ github.event.pull_request.comments_url }}

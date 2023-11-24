@@ -1,0 +1,32 @@
+name: PR Quality Check Run
+
+on:
+    pull_request:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+    quality-check:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  ref: ${{ github.event.pull_request.head.sha }}
+                  persist-credentials: false
+            - uses: actions/setup-python@v2
+              with:
+                  python-version: '3.9'
+            - name: 'Install python dependencies'
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install pyyaml
+            - name: 'Quality check'
+              run: python .github/scripts/validate/main.py
+            - name: 'Publish report'
+              if: ${{ !cancelled() }}
+              run: cat validation_report.md >> $GITHUB_STEP_SUMMARY
+            - uses: actions/upload-artifact@v2
+              with:
+                  name: validation_report.md
